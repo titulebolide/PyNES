@@ -90,19 +90,15 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
         }
         break;
 
-    
     default:
         break;
     }
-    
-
 }
 
 uint8_t PpuDevice::get(uint16_t addr) {
     uint8_t retval;
     uint8_t controller_state;
-    switch (addr)
-    {
+    switch (addr) {
     case KEY_PPUDATA:
         // get buffer value
         retval = ppudata_buffer;

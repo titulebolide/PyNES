@@ -1,5 +1,7 @@
 #include <iostream>
 #include <chrono>
+#include "audio.hpp"
+
 
 #include "lstdebugger.hpp"
 #include "cpu.hpp"
@@ -37,6 +39,8 @@ void ui(PpuDevice * ppu) {
     }
     sigaction(SIGINT, &action, NULL);
 
+    Beeper b;
+
     if(!SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0"))
     {
         std::cout << "SDL can not disable compositor bypass!" << std::endl;
@@ -73,6 +77,8 @@ void ui(PpuDevice * ppu) {
 
     uint8_t kb_state = 0;
 
+    int n = 0;
+
     while(!quit) {
         SDL_Event e;
         uint8_t kb_status = 0;
@@ -95,22 +101,35 @@ void ui(PpuDevice * ppu) {
                 }
             }
         }
-        ppu->set_kb_state(kb_state);
-        ppu->render();
-
-        // void* pixels;
-        // int pitch;
-        // SDL_LockTexture(texture, nullptr, &pixels, &pitch);
-        // cv::Mat sdlImage(frame->rows, frame->cols, CV_8UC3, pixels, pitch);
-        // cv::cvtColor(*frame, sdlImage, cv::COLOR_BGR2RGB);
-        // SDL_UnlockTexture(texture);
+        // std::cout << ppu->get_period_sq1() << std::endl;
+        if (ppu->is_sq1_fresh()) {
+            uint16_t period;
+            uint8_t length;
+            ppu->get_period_sq1(&period, &length);
+            std::cout << "sq1: " << period << " " << static_cast<int>(length) << std::endl;
+            b.setFrequency1(1789773 /  (16.0f*( static_cast<float>(period) + 1)), static_cast<float>(length)/240.0f);
+        }
+        if (ppu->is_sq2_fresh()) {
+            uint16_t period;
+            uint8_t length;
+            ppu->get_period_sq2(&period, &length);
+            std::cout << "sq2: " << period << " " << static_cast<int>(length) << std::endl;
+            b.setFrequency2(1789773 /  (16.0f*( static_cast<float>(period) + 1)), static_cast<float>(length)/240.0f);
+        }
         
-        SDL_UpdateTexture(texture, nullptr, frame->data, frame->step1());
-    
-        SDL_RenderClear(renderer);
-        SDL_RenderCopy(renderer, texture, nullptr, nullptr);
-        SDL_RenderPresent(renderer);
-        SDL_Delay(40);
+        n++;
+        if (n % 4 == 0) {
+            n = 0;
+
+            ppu->set_kb_state(kb_state);
+            ppu->render();
+
+            SDL_UpdateTexture(texture, nullptr, frame->data, frame->step1());
+            SDL_RenderClear(renderer);
+            SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+            SDL_RenderPresent(renderer);
+        }
+        SDL_Delay(10);
     }
 
     SDL_DestroyTexture(texture);
@@ -131,7 +150,7 @@ void run(Emu6502 * cpu, PpuDevice * ppu, bool * kill) {
 
         if (loopCount % 100000 == 0) {
             // slow down !
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            std::this_thread::sleep_for(std::chrono::milliseconds(30));
         }
 
         // if (loopCount % 200000 == 0) {
